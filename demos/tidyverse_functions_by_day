@@ -1,0 +1,17 @@
+Monday
+======
+
+read_tsv()
+gather()
+filter()
+group_by()
+ungroup()
+mutate()
+separate()
+rename()
+summarise()
+top_n()
+replace_na()
+ggplot()
+geom_col()
+coord_flip()
