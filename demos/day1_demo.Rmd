@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 library(readr)
 library(tidyr)
 library(dplyr)
@@ -78,6 +78,10 @@ taxonomy <- read_tsv(
   rename(seqid = `Feature ID`)
 ```
 
+# Results
+
+Some samples were very small, should we delete them?
+
 ```{r stacked-barplot-phyla}
 counts %>%
   # Join in taxonomy with counts
@@ -98,4 +102,3 @@ counts %>%
     #axis.text.x = element_text(angle = 60, hjust = 1)
   #)
 ```
-
