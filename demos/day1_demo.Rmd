@@ -1,0 +1,101 @@
+---
+title: "Tunis demo Monday"
+author: "Daniel"
+date: "11/26/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+# Materials and methods
+
+We have three tables: samples, taxonomy and counts. The
+latter one is a relation between the former two and shows 
+the number of observations of a particular taxon in a 
+particular sample.
+
+The tables are read from tsv files, i.e. tab separated 
+files using the ReadR `read_tsv()` function.
+
+```{r read-data}
+# Read the counts table
+counts <- read_tsv(
+  '../data/atacama-soils.asvtable.tsv',
+  col_types = cols(
+    .default = col_integer(), seqid = col_character()
+  )
+) %>%
+  # Make the "wide" table "long"
+  gather(sample, count, 2:67) %>%
+  # Get rid of rows with zero counts
+  filter(count > 0)
+
+# Read the samples table
+samples <- read_tsv(
+  '../data/sample_metadata_single_header.tsv',
+  col_types = cols(
+    .default = col_double(),
+    SampleID = col_character(),
+    BarcodeSequence = col_character(),
+    LinkerPrimerSequence = col_character(),
+    Elevation = col_integer(),
+    ExtractGroupNo = col_character(),
+    TransectName = col_character(),
+    SiteName = col_character(),
+    Depth = col_integer(),
+    TOC = col_integer(),
+    Vegetation = col_character(),
+    Description = col_character()
+  )
+)
+
+# Read the taxonomy
+taxonomy <- read_tsv(
+  '../data/taxonomy.tsv',
+  col_types = cols(.default = col_character(), Confidence = col_double())
+) %>%
+  # Get rid of the "D_[0-9]__" string that starts each individual taxon
+  mutate(
+    Taxon = gsub('D_[0-9]__', '', Taxon)
+  ) %>%
+  # Separate the long taxon string into separate taxa
+  separate(
+    Taxon,
+    c(
+      'domain', 'phylum', 'class', 
+      'order', 'family', 'genus', 'species'
+    ),
+    sep = ';',
+    fill = 'right'
+  ) %>%
+  # Rename the Feature ID so it's seqid, like in the counts table
+  rename(seqid = `Feature ID`)
+```
+
+```{r stacked-barplot-phyla}
+counts %>%
+  # Join in taxonomy with counts
+  inner_join(taxonomy, by = 'seqid') %>%
+  # Calculate a sum of counts per phylum and sample
+  group_by(phylum, sample) %>%
+  summarise(count = sum(count)) %>%
+  # Good habit: Don't forget to ungroup()
+  ungroup() %>%
+  # Plot: sample on x-axis, count on y and phylum as fill colour
+  ggplot(aes(x = sample, y = count, fill = phylum)) +
+  # Stacked barplot
+  geom_col() +
+  # Flip the axes
+  coord_flip()
+  # This is how you turn labels if you don't want to flip axes
+  #theme(
+    #axis.text.x = element_text(angle = 60, hjust = 1)
+  #)
+```
+
