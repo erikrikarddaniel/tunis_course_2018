@@ -119,3 +119,42 @@ samples %>%
   facet_wrap(~meastype, scales = 'free_x')
 ```
 
+```{r rarefy}
+# Calculate minimum size for any sample
+minsize <- counts %>%
+  group_by(sample) %>%
+  summarise(count = sum(count)) %>%
+  summarise(mincount = min(count)) %>%
+  ungroup() %>%
+  pull(mincount)
+# Calculate rarified counts
+counts <- counts %>%
+  left_join(
+    counts %>%
+      select(-relab) %>%
+      spread(seqid, count, fill = 0) %>%
+      data.frame() %>%
+      tibble::column_to_rownames('sample') %>%
+      rrarefy(minsize) %>%
+      data.frame() %>%
+      tibble::rownames_to_column('sample') %>%
+      gather(seqid, rcount, 2:ncol(.)) %>%
+      filter(rcount > 0),
+    by = c('seqid', 'sample')
+  ) %>%
+  replace_na(list(rcount = 0))
+```
+
+```{r plot-shannon}
+counts %>%
+  select(-count, -relab) %>%
+  spread(seqid, rcount, fill = 0) %>%
+  data.frame() %>%
+  tibble::column_to_rownames('sample') %>%
+  diversity() %>%
+  data.frame(shannon = .) %>%
+  tibble::rownames_to_column('sample') %>%
+  ggplot(aes(x = sample, y = shannon)) +
+  geom_point()
+```
+
