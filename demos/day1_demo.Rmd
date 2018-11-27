@@ -118,6 +118,7 @@ counts %>%
   ggplot(aes(x = sample, y = count, fill = topphylum)) +
   # Stacked barplot
   geom_col(position = 'fill') +
+  scale_fill_brewer('Phylum', palette = 'Paired') +
   # Flip the axes
   coord_flip()
   # This is how you turn labels if you don't want to flip axes
