@@ -16,3 +16,12 @@ ggplot()
 geom_col()
 coord_flip()
 scale_colour_brewer()
+
+Tuesday
+=======
+
+select()
+geom_violin()
+geom_boxplot()
+geom_jitter()
+facet_wrap()
