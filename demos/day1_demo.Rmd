@@ -84,7 +84,7 @@ taxonomy <- read_tsv(
   rename(seqid = `Feature ID`)
 ```
 
-```{r}
+```{r topphylum}
 taxonomy <- taxonomy %>%
   left_join(
     counts %>%
@@ -94,10 +94,11 @@ taxonomy <- taxonomy %>%
       summarise(mean_relab = mean(relab)) %>%
       ungroup() %>%
       top_n(10, mean_relab) %>%
-      transmute(phylum, topphylum = phylum),
+      transmute(phylum, topphylum = phylum, mean_relab),
     by = 'phylum'
   ) %>%
-  replace_na(list(topphylum = 'Other phyla'))
+  replace_na(list(topphylum = 'Other phyla', mean_relab = 0)) %>%
+  mutate(topphylum = as.factor(topphylum))
 ```
 
 
@@ -110,12 +111,12 @@ counts %>%
   # Join in taxonomy with counts
   inner_join(taxonomy, by = 'seqid') %>%
   # Calculate a sum of counts per phylum and sample
-  group_by(topphylum, sample) %>%
+  group_by(topphylum, mean_relab, sample) %>%
   summarise(count = sum(count)) %>%
   # Good habit: Don't forget to ungroup()
   ungroup() %>%
   # Plot: sample on x-axis, count on y and phylum as fill colour
-  ggplot(aes(x = sample, y = count, fill = topphylum)) +
+  ggplot(aes(x = sample, y = count, fill = forcats::fct_reorder(topphylum, mean_relab, .desc = TRUE))) +
   # Stacked barplot
   geom_col(position = 'fill') +
   scale_fill_brewer('Phylum', palette = 'Paired') +
