@@ -1,0 +1,66 @@
+---
+title: "Tunis demo Thursday"
+author: "Daniel"
+date: "11/29/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.path = 'figures/')
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+# Materials and methods
+
+We have three tables: samples, taxonomy and counts. The
+latter one is a relation between the former two and shows 
+the number of observations of a particular taxon in a 
+particular sample.
+
+The tables are read from tsv files, i.e. tab separated 
+files using the ReadR `read_tsv()` function.
+
+```{r read-data}
+# Read the counts table
+counts <- read_tsv(
+  '../data/atacama-soils.asvtable.tsv',
+  col_types = cols(
+    .default = col_integer(), seqid = col_character()
+  )
+) %>%
+  # Make the "wide" table "long"
+  gather(sample, count, 2:67) %>%
+  # Get rid of rows with zero counts
+  filter(count > 0) %>%
+  group_by(sample) %>%
+  filter(sum(count) >= 1000) %>%
+  ungroup() %>%
+  group_by(sample) %>%
+  mutate(relab = count/sum(count)) %>%
+  ungroup()
+```
+
+```{r rank-abundance-curve}
+counts %>%
+  filter(! sample %in% c('BAQ895.2', 'BAQ895.3')) %>%
+  group_by(sample) %>%
+  summarise(tcount = sum(count)) %>%
+  mutate(sr = rank(desc(tcount))) %>%
+  ungroup() %>%
+  inner_join(
+    counts %>%
+      group_by(sample) %>%
+      mutate(r = rank(desc(relab))) %>%
+      ungroup(),
+    by = 'sample'
+  ) %>%
+  mutate(r = r + 5 * sr) %>%
+  ggplot(aes(x = r, y = relab, colour = sample)) +
+  geom_line(aes(group = sample)) +
+  # This gets rid of the legend:
+  scale_colour_discrete(guide = FALSE)
+```
+
