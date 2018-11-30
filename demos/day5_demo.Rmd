@@ -1,0 +1,116 @@
+---
+title: "Tunis demo Friday"
+author: "Daniel"
+date: "11/30/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.path = 'figures/')
+library(edgeR)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r read-data}
+# Read the counts table
+counts <- read_tsv(
+  '../data/atacama-soils.asvtable.tsv',
+  col_types = cols(
+    .default = col_integer(), seqid = col_character()
+  )
+) %>%
+  # Make the "wide" table "long"
+  gather(sample, count, 2:67) %>%
+  # Get rid of rows with zero counts
+  filter(count > 0) %>%
+  group_by(sample) %>%
+  filter(sum(count) >= 1000) %>%
+  ungroup() %>%
+  group_by(sample) %>%
+  mutate(relab = count/sum(count)) %>%
+  ungroup()
+
+# Read the samples table
+samples <- read_tsv(
+  '../data/sample_metadata_single_header.tsv',
+  col_types = cols(
+    .default = col_double(),
+    SampleID = col_character(),
+    BarcodeSequence = col_character(),
+    LinkerPrimerSequence = col_character(),
+    Elevation = col_integer(),
+    ExtractGroupNo = col_character(),
+    TransectName = col_character(),
+    SiteName = col_character(),
+    Depth = col_integer(),
+    TOC = col_integer(),
+    Vegetation = col_character(),
+    Description = col_character()
+  )
+)
+
+# Read the taxonomy
+taxonomy <- read_tsv(
+  '../data/taxonomy.tsv',
+  col_types = cols(.default = col_character(), Confidence = col_double())
+) %>%
+  # Get rid of the "D_[0-9]__" string that starts each individual taxon
+  mutate(
+    Taxon = gsub('D_[0-9]__', '', Taxon)
+  ) %>%
+  # Separate the long taxon string into separate taxa
+  separate(
+    Taxon,
+    c(
+      'domain', 'phylum', 'class', 
+      'order', 'family', 'genus', 'species'
+    ),
+    sep = ';',
+    fill = 'right'
+  ) %>%
+  # Rename the Feature ID so it's seqid, like in the counts table
+  rename(seqid = `Feature ID`)
+```
+
+```{r topphyla}
+taxonomy <- taxonomy %>%
+  left_join(
+    counts %>%
+      inner_join(taxonomy, by = 'seqid') %>%
+      group_by(phylum, sample) %>%
+      summarise(relab = sum(relab)) %>%
+      summarise(mean_relab = mean(relab)) %>%
+      ungroup() %>%
+      top_n(10, mean_relab) %>%
+      transmute(phylum, topphylum = phylum),
+    by = 'phylum'
+  ) %>%
+  replace_na(list(topphylum = 'Other phyla'))
+```
+
+# Downsampling the datasets
+
+I'm selecting observations only from the Yungay transect with humidities > 85 and < 50%.
+
+```{r}
+d <- samples %>%
+  inner_join(counts, by = c('SampleID' = 'sample')) %>% 
+  filter(TransectName == 'Baquedano') %>% 
+  filter(AverageSoilRelativeHumidity > 85 | AverageSoilRelativeHumidity < 50) %>% 
+  mutate(h = ifelse(AverageSoilRelativeHumidity > 75, 'high', 'low')) %>%
+  select(SampleID, seqid, count, h) %>%
+  arrange(h, SampleID) %>%
+  select(-h) %>%
+  spread(SampleID, count, fill = 0) %>%
+  tibble::column_to_rownames('seqid') 
+dge <- d %>%
+  DGEList(group = c(1,1,1,1,1,0,0,0,0,0)) %>%
+  calcNormFactors() %>%
+  estimateDisp()
+et <- exactTest(dge)
+tt <- topTags(et, n = 100000)
+```
+
